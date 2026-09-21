@@ -1,0 +1,60 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.x'
+          channel: stable
+          cache: true
+
+      - name: Check google-services.json
+        run: |
+          if [ ! -f google-services.json ]; then
+            echo "::error::google-services.json is missing from the repo root. Download it from Firebase console (Project settings > Your apps > Android) and commit it next to pubspec.yaml."
+            exit 1
+          fi
+
+      - name: Generate Android platform files
+        run: |
+          mkdir -p /tmp/keep
+          cp -r lib /tmp/keep/lib
+          cp pubspec.yaml /tmp/keep/pubspec.yaml
+          flutter create --platforms=android --org com.teabreak --project-name circles --no-pub .
+          # make sure flutter create did not touch our sources
+          rm -rf lib && cp -r /tmp/keep/lib lib
+          cp /tmp/keep/pubspec.yaml pubspec.yaml
+          rm -rf test
+
+      - name: Patch Android project (Firebase, notifications, permissions)
+        run: python3 tools/patch_android.py
+
+      - name: Use fixed signing key (so new APKs install over old ones)
+        run: |
+          mkdir -p ~/.android
+          cp tools/debug.keystore ~/.android/debug.keystore
+
+      - run: flutter pub get
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tea-break-circles-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error

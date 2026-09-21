@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isMember(gid) {
+      return request.auth.uid in
+        get(/databases/$(database)/documents/groups/$(gid)).data.memberIds;
+    }
+
+    // Public profile (name + email) so friends can find each other.
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Push token: private. Only the owner (and the Cloud Function) can touch it.
+    match /tokens/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /groups/{gid} {
+      allow read: if signedIn() && request.auth.uid in resource.data.memberIds;
+      allow create: if signedIn()
+        && request.auth.uid == request.resource.data.ownerId
+        && request.auth.uid in request.resource.data.memberIds;
+      allow update, delete: if signedIn() && request.auth.uid == resource.data.ownerId;
+
+      match /calls/{cid} {
+        // any member can tap the circle
+        allow create: if signedIn()
+          && request.resource.data.createdBy == request.auth.uid
+          && isMember(gid);
+
+        match /responses/{uid} {
+          allow read: if signedIn() && isMember(gid);
+          // you may only write YOUR OWN answer
+          allow create, update: if signedIn()
+            && request.auth.uid == uid
+            && request.resource.data.status in ['delivered', 'accepted', 'declined'];
+        }
+      }
+    }
+
+    // Needed for the "calls sent to my circles" collection-group query.
+    match /{path=**}/calls/{cid} {
+      allow read: if signedIn() && request.auth.uid in resource.data.memberIds;
+    }
+  }
+}
