@@ -2,6 +2,17 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models.dart';
+import 'push_sender.dart';
+
+/// Returned when you tap a circle.
+class CallHandle {
+  CallHandle(this.id, this.pushResult) : startedAt = DateTime.now();
+  final String id;
+  final DateTime startedAt;
+
+  /// null = notifications sent OK, otherwise a problem description.
+  final Future<String?> pushResult;
+}
 
 /// All Firestore access lives here.
 class CircleService {
@@ -86,10 +97,9 @@ class CircleService {
 
   // ------------------------------------------------------------ calls
 
-  /// One tap on a circle. Returns the new call id immediately; the write is
-  /// queued by Firestore if the phone is offline. A Cloud Function then sends
-  /// the push notifications.
-  static String startCall(TeaCircle c) {
+  /// One tap on a circle: saves the call and sends a push to every friend.
+  /// Returns immediately; if the phone is offline Firestore queues the write.
+  static CallHandle startCall(TeaCircle c) {
     final ref = _db.collection('groups').doc(c.id).collection('calls').doc();
     ref.set({
       'createdBy': myUid,
@@ -99,7 +109,14 @@ class CircleService {
       'memberIds': c.memberIds,
       'createdAt': FieldValue.serverTimestamp(),
     }).catchError((_) {});
-    return ref.id;
+    final push = PushSender.sendCall(
+      circle: c,
+      callId: ref.id,
+      callerUid: myUid,
+      callerName: myName,
+      message: c.message,
+    );
+    return CallHandle(ref.id, push);
   }
 
   /// Calls (last 10 minutes) sent to circles I belong to.

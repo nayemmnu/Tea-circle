@@ -63,11 +63,11 @@ class _HomeScreenState extends State<HomeScreen> {
         reason == SnackBarClosedReason.dismiss;
     if (!send || !mounted) return;
 
-    final callId = CircleService.startCall(c);
+    final handle = CircleService.startCall(c);
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => CallStatusScreen(circle: c, callId: callId),
+        builder: (_) => CallStatusScreen(circle: c, handle: handle),
       ),
     );
   }

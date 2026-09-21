@@ -48,6 +48,19 @@ jobs:
           mkdir -p ~/.android
           cp tools/debug.keystore ~/.android/debug.keystore
 
+      - name: Add push credentials (from the FCM_SERVICE_ACCOUNT secret)
+        env:
+          FCM_SA: ${{ secrets.FCM_SERVICE_ACCOUNT }}
+        run: |
+          mkdir -p assets
+          if [ -n "$FCM_SA" ]; then
+            printf '%s' "$FCM_SA" > assets/fcm_service_account.json
+            echo "Push credentials added."
+          else
+            echo '{}' > assets/fcm_service_account.json
+            echo "::warning::FCM_SERVICE_ACCOUNT secret is not set. The app will build, but it cannot send push notifications."
+          fi
+
       - run: flutter pub get
 
       - name: Build release APK

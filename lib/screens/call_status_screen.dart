@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
@@ -6,10 +8,20 @@ import '../services/circle_service.dart';
 
 /// Live board: who is coming (green), who cannot (red), who is offline
 /// (grey), who has not answered yet (amber).
-class CallStatusScreen extends StatelessWidget {
-  const CallStatusScreen({super.key, required this.circle, required this.callId});
+class CallStatusScreen extends StatefulWidget {
+  const CallStatusScreen(
+      {super.key, required this.circle, required this.handle});
   final TeaCircle circle;
-  final String callId;
+  final CallHandle handle;
+
+  @override
+  State<CallStatusScreen> createState() => _CallStatusScreenState();
+}
+
+class _CallStatusScreenState extends State<CallStatusScreen> {
+  /// A friend whose phone has not confirmed receipt after this long is
+  /// shown as unavailable (offline).
+  static const _waitLimit = Duration(seconds: 45);
 
   static const _order = {
     'accepted': 0,
@@ -19,29 +31,69 @@ class CallStatusScreen extends StatelessWidget {
     'unavailable': 4,
   };
 
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  String _effective(String? stored) {
+    final s = stored ?? 'pending';
+    if (s == 'pending' &&
+        DateTime.now().difference(widget.handle.startedAt) > _waitLimit) {
+      return 'unavailable';
+    }
+    return s;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final db = FirebaseFirestore.instance;
-    final callRef = db.doc('groups/${circle.id}/calls/$callId');
+    final circle = widget.circle;
+    final callRef = FirebaseFirestore.instance
+        .doc('groups/${circle.id}/calls/${widget.handle.id}');
     final me = CircleService.myUid;
 
     return Scaffold(
       appBar: AppBar(title: Text(circle.name)),
       body: Column(
         children: [
+          // problem while sending notifications
+          FutureBuilder<String?>(
+            future: widget.handle.pushResult,
+            builder: (context, snap) {
+              final err = snap.data;
+              if (err == null) return const SizedBox.shrink();
+              return Container(
+                width: double.infinity,
+                color: Colors.red.shade100,
+                padding: const EdgeInsets.all(10),
+                child: Text(err, style: const TextStyle(color: Colors.black87)),
+              );
+            },
+          ),
           // "still sending" banner while the phone has no connection
           StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
             stream: callRef.snapshots(includeMetadataChanges: true),
             builder: (context, snap) {
-              final sending = snap.hasData && snap.data!.metadata.hasPendingWrites;
+              final sending =
+                  snap.hasData && snap.data!.metadata.hasPendingWrites;
               if (!sending) return const SizedBox.shrink();
               return Container(
                 width: double.infinity,
                 color: Colors.orange.shade200,
                 padding: const EdgeInsets.all(10),
                 child: const Text(
-                  'Sending… waiting for a connection. Friends are notified '
-                  'as soon as you are online.',
+                  'Sending… waiting for a connection.',
                   style: TextStyle(color: Colors.black87),
                 ),
               );
@@ -75,7 +127,7 @@ class CallStatusScreen extends StatelessWidget {
                 };
                 final entries = circle.memberIds
                     .map((uid) => MapEntry(
-                        uid, uid == me ? 'accepted' : (byUid[uid] ?? 'pending')))
+                        uid, uid == me ? 'accepted' : _effective(byUid[uid])))
                     .toList()
                   ..sort((a, b) =>
                       (_order[a.value] ?? 9).compareTo(_order[b.value] ?? 9));
@@ -108,8 +160,10 @@ class CallStatusScreen extends StatelessWidget {
                       child: ListView(
                         children: [
                           for (final e in entries)
-                            _row(circle.nameOf(e.key) +
-                                (e.key == me ? ' (You)' : ''), e.value),
+                            _row(
+                                circle.nameOf(e.key) +
+                                    (e.key == me ? ' (You)' : ''),
+                                e.value),
                         ],
                       ),
                     ),

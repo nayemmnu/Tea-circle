@@ -47,9 +47,9 @@ class _InviteCardState extends State<InviteCard> {
         final status = snap.data?.data()?['status'] as String?;
 
         // The app is open and online, so tell the server we received it.
-        if (exists &&
+        if (snap.hasData &&
             !_ackSent &&
-            (status == 'pending' || status == 'unavailable')) {
+            (!exists || status == 'pending' || status == 'unavailable')) {
           _ackSent = true;
           CircleService.respond(
                   groupId: i.groupId, callId: i.callId, status: 'delivered')

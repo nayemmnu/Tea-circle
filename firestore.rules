@@ -14,9 +14,12 @@ service cloud.firestore {
       allow write: if signedIn() && request.auth.uid == uid;
     }
 
-    // Push token: private. Only the owner (and the Cloud Function) can touch it.
+    // Push token of a phone. Anyone signed in can read ONE token by id (the
+    // caller's phone needs it to notify friends), but nobody can list them,
+    // and only the owner can write it.
     match /tokens/{uid} {
-      allow read, write: if signedIn() && request.auth.uid == uid;
+      allow get: if signedIn();
+      allow create, update, delete: if signedIn() && request.auth.uid == uid;
     }
 
     match /groups/{gid} {

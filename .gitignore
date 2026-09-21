@@ -14,11 +14,12 @@ pubspec.lock
 /android/
 /ios/
 
-# Firebase functions
-functions/node_modules/
-functions/*.log
+# Firebase CLI
 .firebase/
 firebase-debug.log
+
+# Push key: written by CI from the FCM_SERVICE_ACCOUNT secret. NEVER commit it.
+/assets/fcm_service_account.json
 
 # NOTE: google-services.json is intentionally NOT ignored (CI needs it).
 # Keep the repository private.
