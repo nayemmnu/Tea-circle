@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "866944296981",
+    "project_id": "tea-circles",
+    "storage_bucket": "tea-circles.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:866944296981:android:7aac84c969e8498951461c",
+        "android_client_info": {
+          "package_name": "com.teabreak.circles"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAzLvDOAjq2dXqTyQgECxCJTCQ1Ybc0zw0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
